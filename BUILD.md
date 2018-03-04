@@ -5,7 +5,7 @@ hashcat build documentation
 
 # Author: see docs/credits.txt
 
-# Building hashcat for Linux and macOS
+# Building hashcat for Linux and OSX
 
 Get a copy of the **hashcat** repository
 
