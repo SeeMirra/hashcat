@@ -34,8 +34,7 @@ void *hc_dlsym   (void *module, const char *symbol);
       if (noerr == 1) { \
         event_log_error (hashcat_ctx, "%s is missing from %s shared library.", #name, #libname); \
         return -1; \
-      } \
-      if (noerr != 1) { \
+      } else { \
         event_log_warning (hashcat_ctx, "%s is missing from %s shared library.", #name, #libname); \
         return 0; \
       } \
@@ -49,8 +48,7 @@ void *hc_dlsym   (void *module, const char *symbol);
       if (noerr == 1) { \
         event_log_error (hashcat_ctx, "%s is missing from %s shared library.", #name, #libname); \
         return -1; \
-      } \
-      if (noerr != 1) { \
+      } else { \
         event_log_warning (hashcat_ctx, "%s is missing from %s shared library.", #name, #libname); \
         return 0; \
       } \
@@ -63,8 +61,7 @@ void *hc_dlsym   (void *module, const char *symbol);
     if (noerr == 1) { \
       event_log_error (hashcat_ctx, "%s at address %08x is missing from %s shared library.", #name, addr, #libname); \
       return -1; \
-    } \
-    if (noerr != 1) { \
+    } else { \
       event_log_warning (hashcat_ctx, "%s at address %08x is missing from %s shared library.", #name, addr, #libname); \
       return 0; \
     } \

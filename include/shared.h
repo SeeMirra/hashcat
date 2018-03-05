@@ -31,11 +31,17 @@ char *filename_from_filepath (char *filepath);
 void naive_replace (char *s, const char key_char, const char replace_char);
 void naive_escape (char *s, size_t s_max, const char key_char, const char escape_char);
 
-__attribute__ ((format (printf, 2, 3))) void hc_asprintf (char **strp, const char *fmt, ...);
+void hc_asprintf (char **strp, const char *fmt, ...);
+
+void hc_sleep_msec (const u32 msec);
+void hc_sleep      (const u32 sec);
 
 void setup_environment_variables (void);
 void setup_umask (void);
 void setup_seeding (const bool rp_gen_seed_chgd, const u32 rp_gen_seed);
+
+int hc_stat (const char *pathname, hc_stat_t *buf);
+int hc_fstat (int fd, hc_stat_t *buf);
 
 void  hc_qsort_r (void *base, size_t nmemb, size_t size, int (*compar) (const void *, const void *, void *), void *arg);
 void *hc_bsearch_r (const void *key, const void *base, size_t nmemb, size_t size, int (*compar) (const void *, const void *, void *), void *arg);
@@ -49,22 +55,5 @@ bool hc_path_write (const char *path);
 bool hc_path_create (const char *path);
 
 bool hc_string_is_digit (const char *s);
-
-void hc_string_trim_trailing (char *s);
-void hc_string_trim_leading (char *s);
-
-size_t hc_fread (void *ptr, size_t size, size_t nmemb, FILE *stream);
-void   hc_fwrite (const void *ptr, size_t size, size_t nmemb, FILE *stream);
-
-bool hc_same_files (char *file1, char *file2);
-
-u32 hc_strtoul  (const char *nptr, char **endptr, int base);
-u64 hc_strtoull (const char *nptr, char **endptr, int base);
-
-u32 power_of_two_ceil_32  (const u32 v);
-u32 power_of_two_floor_32 (const u32 v);
-
-u32 round_up_multiple_32 (const u32 v, const u32 m);
-u64 round_up_multiple_64 (const u64 v, const u64 m);
 
 #endif // _SHARED_H

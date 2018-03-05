@@ -1,5 +1,5 @@
 /* LzmaDec.h -- LZMA Decoder
-2017-04-03 : Igor Pavlov : Public domain */
+2013-01-18 : Igor Pavlov : Public domain */
 
 #ifndef __LZMA_DEC_H
 #define __LZMA_DEC_H
@@ -18,7 +18,6 @@ EXTERN_C_BEGIN
 #define CLzmaProb UInt16
 #endif
 
-
 /* ---------- LZMA Properties ---------- */
 
 #define LZMA_PROPS_SIZE 5
@@ -36,7 +35,6 @@ Returns:
 */
 
 SRes LzmaProps_Decode(CLzmaProps *p, const Byte *data, unsigned size);
-
 
 /* ---------- LZMA Decoder state ---------- */
 
@@ -106,7 +104,6 @@ typedef enum
 
 /* ELzmaStatus is used only as output value for function call */
 
-
 /* ---------- Interfaces ---------- */
 
 /* There are 3 levels of interfaces:
@@ -115,7 +112,6 @@ typedef enum
      3) One Call Interface
    You can select any of these interfaces, but don't mix functions from different
    groups for same object. */
-
 
 /* There are two variants to allocate state for Dictionary Interface:
      1) LzmaDec_Allocate / LzmaDec_Free
@@ -129,11 +125,11 @@ LzmaDec_Allocate* can return:
   SZ_ERROR_UNSUPPORTED - Unsupported properties
 */
    
-SRes LzmaDec_AllocateProbs(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAllocPtr alloc);
-void LzmaDec_FreeProbs(CLzmaDec *p, ISzAllocPtr alloc);
+SRes LzmaDec_AllocateProbs(CLzmaDec *p, const Byte *props, unsigned propsSize, ISzAlloc *alloc);
+void LzmaDec_FreeProbs(CLzmaDec *p, ISzAlloc *alloc);
 
-SRes LzmaDec_Allocate(CLzmaDec *state, const Byte *prop, unsigned propsSize, ISzAllocPtr alloc);
-void LzmaDec_Free(CLzmaDec *state, ISzAllocPtr alloc);
+SRes LzmaDec_Allocate(CLzmaDec *state, const Byte *prop, unsigned propsSize, ISzAlloc *alloc);
+void LzmaDec_Free(CLzmaDec *state, ISzAlloc *alloc);
 
 /* ---------- Dictionary Interface ---------- */
 
@@ -179,7 +175,6 @@ Returns:
 SRes LzmaDec_DecodeToDic(CLzmaDec *p, SizeT dicLimit,
     const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
 
-
 /* ---------- Buffer Interface ---------- */
 
 /* It's zlib-like interface.
@@ -195,7 +190,6 @@ finishMode:
 
 SRes LzmaDec_DecodeToBuf(CLzmaDec *p, Byte *dest, SizeT *destLen,
     const Byte *src, SizeT *srcLen, ELzmaFinishMode finishMode, ELzmaStatus *status);
-
 
 /* ---------- One Call Interface ---------- */
 
@@ -220,8 +214,10 @@ Returns:
 
 SRes LzmaDecode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
     const Byte *propData, unsigned propSize, ELzmaFinishMode finishMode,
-    ELzmaStatus *status, ISzAllocPtr alloc);
+    ELzmaStatus *status, ISzAlloc *alloc);
 
 EXTERN_C_END
+
+void LzmaDec_InitDicAndState(CLzmaDec *p, Bool initDic, Bool initState);
 
 #endif

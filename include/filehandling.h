@@ -12,10 +12,10 @@
 
 u64 count_lines (FILE *fd);
 
-size_t fgetl (FILE *fp, char *line_buf);
+int fgetl (FILE *fp, char *line_buf);
 
 size_t superchop_with_length (char *buf, const size_t len);
 
-size_t in_superchop (char *buf);
+int in_superchop (char *buf);
 
 #endif // _FILEHANDLING_H

@@ -26,8 +26,8 @@ void goodbye_screen (hashcat_ctx_t *hashcat_ctx, const time_t proc_start, const 
 
 int setup_console (void);
 
-void send_prompt  (hashcat_ctx_t *hashcat_ctx);
-void clear_prompt (hashcat_ctx_t *hashcat_ctx);
+void send_prompt (void);
+void clear_prompt (void);
 
 void *thread_keypress (void *p);
 
@@ -40,8 +40,6 @@ int tty_getchar(void);
 int tty_fix(void);
 
 void compress_terminal_line_length (char *out_buf, const size_t keep_from_beginning, const size_t keep_from_end);
-
-void example_hashes                     (hashcat_ctx_t *hashcat_ctx);
 
 void opencl_info                        (hashcat_ctx_t *hashcat_ctx);
 void opencl_info_compact                (hashcat_ctx_t *hashcat_ctx);
