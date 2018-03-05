@@ -6,7 +6,6 @@
 #include "common.h"
 #include "types.h"
 #include "memory.h"
-#include "bitops.h"
 #include "event.h"
 #include "dictstat.h"
 #include "locking.h"
@@ -14,8 +13,10 @@
 
 int sort_by_dictstat (const void *s1, const void *s2)
 {
-  const dictstat_t *d1 = (const dictstat_t *) s1;
-  const dictstat_t *d2 = (const dictstat_t *) s2;
+  dictstat_t *d1 = (dictstat_t *) s1;
+  dictstat_t *d2 = (dictstat_t *) s2;
+
+  d2->stat.st_atime = d1->stat.st_atime;
 
   const int rc_from = strcmp (d1->encoding_from, d2->encoding_from);
 
@@ -25,23 +26,7 @@ int sort_by_dictstat (const void *s1, const void *s2)
 
   if (rc_to != 0) return rc_to;
 
-  struct stat stat1;
-  struct stat stat2;
-
-  memcpy (&stat1, &d1->stat, sizeof (struct stat));
-  memcpy (&stat2, &d2->stat, sizeof (struct stat));
-
-  stat1.st_atime = 0;
-  stat2.st_atime = 0;
-
-  #if defined (STAT_NANOSECONDS_ACCESS_TIME)
-  stat1.STAT_NANOSECONDS_ACCESS_TIME = 0;
-  stat2.STAT_NANOSECONDS_ACCESS_TIME = 0;
-  #endif
-
-  const int rc_memcmp = memcmp (&stat1, &stat2, sizeof (struct stat));
-
-  return rc_memcmp;
+  return memcmp (&d1->stat, &d2->stat, sizeof (struct stat));
 }
 
 int dictstat_init (hashcat_ctx_t *hashcat_ctx)
@@ -52,14 +37,13 @@ int dictstat_init (hashcat_ctx_t *hashcat_ctx)
 
   dictstat_ctx->enabled = false;
 
-  if (user_options->benchmark      == true) return 0;
-  if (user_options->example_hashes == true) return 0;
-  if (user_options->keyspace       == true) return 0;
-  if (user_options->left           == true) return 0;
-  if (user_options->opencl_info    == true) return 0;
-  if (user_options->show           == true) return 0;
-  if (user_options->usage          == true) return 0;
-  if (user_options->version        == true) return 0;
+  if (user_options->benchmark   == true) return 0;
+  if (user_options->keyspace    == true) return 0;
+  if (user_options->left        == true) return 0;
+  if (user_options->opencl_info == true) return 0;
+  if (user_options->show        == true) return 0;
+  if (user_options->usage       == true) return 0;
+  if (user_options->version     == true) return 0;
 
   if (user_options->attack_mode == ATTACK_MODE_BF) return 0;
 
@@ -69,7 +53,7 @@ int dictstat_init (hashcat_ctx_t *hashcat_ctx)
   dictstat_ctx->base     = (dictstat_t *) hccalloc (MAX_DICTSTAT, sizeof (dictstat_t));
   dictstat_ctx->cnt      = 0;
 
-  hc_asprintf (&dictstat_ctx->filename, "%s/%s", folder_config->profile_dir, DICTSTAT_FILENAME);
+  hc_asprintf (&dictstat_ctx->filename, "%s/hashcat.dictstat", folder_config->profile_dir);
 
   return 0;
 }
@@ -101,60 +85,11 @@ void dictstat_read (hashcat_ctx_t *hashcat_ctx)
     return;
   }
 
-  // parse header
-
-  u64 v;
-  u64 z;
-
-  const size_t nread1 = hc_fread (&v, sizeof (u64), 1, fp);
-  const size_t nread2 = hc_fread (&z, sizeof (u64), 1, fp);
-
-  if ((nread1 != 1) || (nread2 != 1))
-  {
-    event_log_error (hashcat_ctx, "%s: Invalid header", dictstat_ctx->filename);
-
-    fclose (fp);
-
-    return;
-  }
-
-  v = byte_swap_64 (v);
-  z = byte_swap_64 (z);
-
-  if ((v & 0xffffffffffffff00) != (DICTSTAT_VERSION & 0xffffffffffffff00))
-  {
-    event_log_error (hashcat_ctx, "%s: Invalid header, ignoring content", dictstat_ctx->filename);
-
-    fclose (fp);
-
-    return;
-  }
-
-  if (z != 0)
-  {
-    event_log_error (hashcat_ctx, "%s: Invalid header, ignoring content", dictstat_ctx->filename);
-
-    fclose (fp);
-
-    return;
-  }
-
-  if ((v & 0xff) < (DICTSTAT_VERSION & 0xff))
-  {
-    event_log_warning (hashcat_ctx, "%s: Outdated header version, ignoring content", dictstat_ctx->filename);
-
-    fclose (fp);
-
-    return;
-  }
-
-  // parse data
-
   while (!feof (fp))
   {
     dictstat_t d;
 
-    const size_t nread = hc_fread (&d, sizeof (dictstat_t), 1, fp);
+    const size_t nread = fread (&d, sizeof (dictstat_t), 1, fp);
 
     if (nread == 0) continue;
 
@@ -195,20 +130,7 @@ int dictstat_write (hashcat_ctx_t *hashcat_ctx)
     return -1;
   }
 
-  // header
-
-  u64 v = DICTSTAT_VERSION;
-  u64 z = 0;
-
-  v = byte_swap_64 (v);
-  z = byte_swap_64 (z);
-
-  hc_fwrite (&v, sizeof (u64), 1, fp);
-  hc_fwrite (&z, sizeof (u64), 1, fp);
-
-  // data
-
-  hc_fwrite (dictstat_ctx->base, sizeof (dictstat_t), dictstat_ctx->cnt, fp);
+  fwrite (dictstat_ctx->base, sizeof (dictstat_t), dictstat_ctx->cnt, fp);
 
   fclose (fp);
 

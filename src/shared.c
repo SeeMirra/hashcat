@@ -7,10 +7,6 @@
 #include "types.h"
 #include "shared.h"
 
-#if defined (__CYGWIN__)
-#include <sys/cygwin.h>
-#endif
-
 static inline int get_msb32 (const u32 v)
 {
   int i;
@@ -156,6 +152,46 @@ void hc_asprintf (char **strp, const char *fmt, ...)
 }
 
 #if defined (_WIN)
+int hc_stat (const char *pathname, hc_stat_t *buf)
+{
+  return stat64 (pathname, buf);
+}
+
+int hc_fstat (int fd, hc_stat_t *buf)
+{
+  return fstat64 (fd, buf);
+}
+#else
+int hc_stat (const char *pathname, hc_stat_t *buf)
+{
+  return stat (pathname, buf);
+}
+
+int hc_fstat (int fd, hc_stat_t *buf)
+{
+  return fstat (fd, buf);
+}
+#endif
+
+void hc_sleep_msec (const u32 msec)
+{
+  #if defined (_WIN)
+  Sleep (msec);
+  #else
+  usleep (msec * 1000);
+  #endif
+}
+
+void hc_sleep (const u32 sec)
+{
+  #if defined (_WIN)
+  Sleep (sec * 1000);
+  #else
+  sleep (sec);
+  #endif
+}
+
+#if defined (_WIN)
 #define __WINDOWS__
 #endif
 #include "sort_r.h"
@@ -176,7 +212,7 @@ void *hc_bsearch_r (const void *key, const void *base, size_t nmemb, size_t size
 
     const size_t c = l + m;
 
-    const char *next = (const char *) base + (c * size);
+    const char *next = (char *) base + (c * size);
 
     const int cmp = (*compar) (key, next, arg);
 
@@ -195,9 +231,9 @@ void *hc_bsearch_r (const void *key, const void *base, size_t nmemb, size_t size
 
 bool hc_path_is_file (const char *path)
 {
-  struct stat s;
+  hc_stat_t s;
 
-  if (stat (path, &s) == -1) return false;
+  if (hc_stat (path, &s) == -1) return false;
 
   if (S_ISREG (s.st_mode)) return true;
 
@@ -206,9 +242,9 @@ bool hc_path_is_file (const char *path)
 
 bool hc_path_is_directory (const char *path)
 {
-  struct stat s;
+  hc_stat_t s;
 
-  if (stat (path, &s) == -1) return false;
+  if (hc_stat (path, &s) == -1) return false;
 
   if (S_ISDIR (s.st_mode)) return true;
 
@@ -217,9 +253,9 @@ bool hc_path_is_directory (const char *path)
 
 bool hc_path_is_empty (const char *path)
 {
-  struct stat s;
+  hc_stat_t s;
 
-  if (stat (path, &s) == -1) return false;
+  if (hc_stat (path, &s) == -1) return false;
 
   if (s.st_size == 0) return true;
 
@@ -286,13 +322,11 @@ void setup_environment_variables ()
 
   if (compute)
   {
-    char *display;
+    static char display[100];
 
-    hc_asprintf (&display, "DISPLAY=%s", compute);
+    snprintf (display, sizeof (display) - 1, "DISPLAY=%s", compute);
 
     putenv (display);
-
-    free (display);
   }
   else
   {
@@ -300,18 +334,38 @@ void setup_environment_variables ()
       putenv ((char *) "DISPLAY=:0");
   }
 
-  if (getenv ("OCL_CODE_CACHE_ENABLE") == NULL)
-    putenv ((char *) "OCL_CODE_CACHE_ENABLE=0");
+  if (getenv ("GPU_FORCE_64BIT_PTR") == NULL)
+    putenv ((char *) "GPU_FORCE_64BIT_PTR=1");
+
+  if (getenv ("GPU_MAX_ALLOC_PERCENT") == NULL)
+    putenv ((char *) "GPU_MAX_ALLOC_PERCENT=100");
+
+  if (getenv ("GPU_SINGLE_ALLOC_PERCENT") == NULL)
+    putenv ((char *) "GPU_SINGLE_ALLOC_PERCENT=100");
+
+  if (getenv ("GPU_MAX_HEAP_SIZE") == NULL)
+    putenv ((char *) "GPU_MAX_HEAP_SIZE=100");
+
+  if (getenv ("CPU_FORCE_64BIT_PTR") == NULL)
+    putenv ((char *) "CPU_FORCE_64BIT_PTR=1");
+
+  if (getenv ("CPU_MAX_ALLOC_PERCENT") == NULL)
+    putenv ((char *) "CPU_MAX_ALLOC_PERCENT=100");
+
+  if (getenv ("CPU_SINGLE_ALLOC_PERCENT") == NULL)
+    putenv ((char *) "CPU_SINGLE_ALLOC_PERCENT=100");
+
+  if (getenv ("CPU_MAX_HEAP_SIZE") == NULL)
+    putenv ((char *) "CPU_MAX_HEAP_SIZE=100");
+
+  if (getenv ("GPU_USE_SYNC_OBJECTS") == NULL)
+    putenv ((char *) "GPU_USE_SYNC_OBJECTS=1");
 
   if (getenv ("CUDA_CACHE_DISABLE") == NULL)
     putenv ((char *) "CUDA_CACHE_DISABLE=1");
 
   if (getenv ("POCL_KERNEL_CACHE") == NULL)
     putenv ((char *) "POCL_KERNEL_CACHE=0");
-
-  #if defined (__CYGWIN__)
-  cygwin_internal (CW_SYNC_WINENV);
-  #endif
 }
 
 void setup_umask ()
@@ -327,9 +381,11 @@ void setup_seeding (const bool rp_gen_seed_chgd, const u32 rp_gen_seed)
   }
   else
   {
-    const time_t ts = time (NULL); // don't tell me that this is an insecure seed
+    time_t ts;
 
-    srand ((unsigned int) ts);
+    time (&ts);
+
+    srand (ts);
   }
 }
 
@@ -341,219 +397,27 @@ u32 get_random_num (const u32 min, const u32 max)
 
   if (low == 0) return (0);
 
-  #if defined (_WIN)
+  #if defined (__linux__)
 
-  return (((u32) rand () % (max - min)) + min);
+  u32 data;
+
+  FILE *fp = fopen ("/dev/urandom", "rb");
+
+  if (fp == NULL) return (0);
+
+  const int nread = fread (&data, sizeof (u32), 1, fp);
+
+  fclose (fp);
+
+  if (nread != 1) return 0;
+
+  u64 r = data % low; r += min;
+
+  return (u32) r;
 
   #else
 
-  return (((u32) random () % (max - min)) + min);
+  return (((u32) rand () % (max - min)) + min);
 
   #endif
-}
-
-void hc_string_trim_leading (char *s)
-{
-  int skip = 0;
-
-  const int len = (int) strlen (s);
-
-  for (int i = 0; i < len; i++)
-  {
-    const int c = (const int) s[i];
-
-    if (isspace (c) == 0) break;
-
-    skip++;
-  }
-
-  if (skip == 0) return;
-
-  const int new_len = len - skip;
-
-  memmove (s, s + skip, new_len);
-
-  s[new_len] = 0;
-}
-
-void hc_string_trim_trailing (char *s)
-{
-  int skip = 0;
-
-  const int len = (int) strlen (s);
-
-  for (int i = len - 1; i >= 0; i--)
-  {
-    const int c = (const int) s[i];
-
-    if (isspace (c) == 0) break;
-
-    skip++;
-  }
-
-  if (skip == 0) return;
-
-  const size_t new_len = len - skip;
-
-  s[new_len] = 0;
-}
-
-size_t hc_fread (void *ptr, size_t size, size_t nmemb, FILE *stream)
-{
-  return fread (ptr, size, nmemb, stream);
-}
-
-void hc_fwrite (const void *ptr, size_t size, size_t nmemb, FILE *stream)
-{
-  size_t rc = fwrite (ptr, size, nmemb, stream);
-
-  if (rc == 0) rc = 0;
-}
-
-bool hc_same_files (char *file1, char *file2)
-{
-  if ((file1 != NULL) && (file2 != NULL))
-  {
-    struct stat tmpstat_file1;
-    struct stat tmpstat_file2;
-
-    int do_check = 0;
-
-    FILE *fp;
-
-    fp = fopen (file1, "r");
-
-    if (fp)
-    {
-      if (fstat (fileno (fp), &tmpstat_file1))
-      {
-        fclose (fp);
-
-        return false;
-      }
-
-      fclose (fp);
-
-      do_check++;
-    }
-
-    fp = fopen (file2, "r");
-
-    if (fp)
-    {
-      if (fstat (fileno (fp), &tmpstat_file2))
-      {
-        fclose (fp);
-
-        return false;
-      }
-
-      fclose (fp);
-
-      do_check++;
-    }
-
-    if (do_check == 2)
-    {
-      tmpstat_file1.st_mode     = 0;
-      tmpstat_file1.st_nlink    = 0;
-      tmpstat_file1.st_uid      = 0;
-      tmpstat_file1.st_gid      = 0;
-      tmpstat_file1.st_rdev     = 0;
-      tmpstat_file1.st_atime    = 0;
-
-      #if defined (STAT_NANOSECONDS_ACCESS_TIME)
-      tmpstat_file1.STAT_NANOSECONDS_ACCESS_TIME = 0;
-      #endif
-
-      #if defined (_POSIX)
-      tmpstat_file1.st_blksize  = 0;
-      tmpstat_file1.st_blocks   = 0;
-      #endif
-
-      tmpstat_file2.st_mode     = 0;
-      tmpstat_file2.st_nlink    = 0;
-      tmpstat_file2.st_uid      = 0;
-      tmpstat_file2.st_gid      = 0;
-      tmpstat_file2.st_rdev     = 0;
-      tmpstat_file2.st_atime    = 0;
-
-      #if defined (STAT_NANOSECONDS_ACCESS_TIME)
-      tmpstat_file2.STAT_NANOSECONDS_ACCESS_TIME = 0;
-      #endif
-
-      #if defined (_POSIX)
-      tmpstat_file2.st_blksize  = 0;
-      tmpstat_file2.st_blocks   = 0;
-      #endif
-
-      if (memcmp (&tmpstat_file1, &tmpstat_file2, sizeof (struct stat)) == 0)
-      {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-u32 hc_strtoul (const char *nptr, char **endptr, int base)
-{
-  return (u32) strtoul (nptr, endptr, base);
-}
-
-u64 hc_strtoull (const char *nptr, char **endptr, int base)
-{
-  return (u64) strtoull (nptr, endptr, base);
-}
-
-u32 power_of_two_ceil_32 (const u32 v)
-{
-  u32 r = v;
-
-  r--;
-
-  r |= r >> 1;
-  r |= r >> 2;
-  r |= r >> 4;
-  r |= r >> 8;
-  r |= r >> 16;
-
-  r++;
-
-  return r;
-}
-
-u32 power_of_two_floor_32 (const u32 v)
-{
-  u32 r = power_of_two_ceil_32 (v);
-
-  if (r > v)
-  {
-    r >>= 1;
-  }
-
-  return r;
-}
-
-u32 round_up_multiple_32 (const u32 v, const u32 m)
-{
-  if (m == 0) return v;
-
-  const u32 r = v % m;
-
-  if (r == 0) return v;
-
-  return v + m - r;
-}
-
-u64 round_up_multiple_64 (const u64 v, const u64 m)
-{
-  if (m == 0) return v;
-
-  const u64 r = v % m;
-
-  if (r == 0) return v;
-
-  return v + m - r;
 }

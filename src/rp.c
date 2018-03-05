@@ -111,21 +111,33 @@ bool class_alpha (const u8 c)
 
 int conv_ctoi (const u8 c)
 {
-  if (class_num (c)) return c - '0';
-  if (class_upper (c)) return c - 'A' + 10;
+  if (class_num (c))
+  {
+    return c - '0';
+  }
+  else if (class_upper (c))
+  {
+    return c - 'A' + 10;
+  }
 
   return -1;
 }
 
 int conv_itoc (const u8 c)
 {
-  if (c < 10) return c + '0';
-  if (c < 37) return c + 'A' - 10;
+  if (c < 10)
+  {
+    return c + '0';
+  }
+  else if (c < 37)
+  {
+    return c + 'A' - 10;
+  }
 
   return -1;
 }
 
-int generate_random_rule (char rule_buf[RP_RULE_SIZE], const u32 rp_gen_func_min, const u32 rp_gen_func_max)
+int generate_random_rule (char rule_buf[RP_RULE_BUFSIZ], const u32 rp_gen_func_min, const u32 rp_gen_func_max)
 {
   u32 rp_gen_num = get_random_num (rp_gen_func_min, rp_gen_func_max);
 
@@ -225,8 +237,8 @@ int generate_random_rule (char rule_buf[RP_RULE_SIZE], const u32 rp_gen_func_min
 
 #define SET_P0_CONV(rule,val)  INCR_POS; (rule)->cmds[rule_cnt] |= ((conv_ctoi (val)) & 0xff) <<  8
 #define SET_P1_CONV(rule,val)  INCR_POS; (rule)->cmds[rule_cnt] |= ((conv_ctoi (val)) & 0xff) << 16
-#define GET_P0_CONV(rule)      INCR_POS; rule_buf[rule_pos] = (char) conv_itoc (((rule)->cmds[rule_cnt] >>  8) & 0xff)
-#define GET_P1_CONV(rule)      INCR_POS; rule_buf[rule_pos] = (char) conv_itoc (((rule)->cmds[rule_cnt] >> 16) & 0xff)
+#define GET_P0_CONV(rule)      INCR_POS; rule_buf[rule_pos] = conv_itoc (((rule)->cmds[rule_cnt] >>  8) & 0xff)
+#define GET_P1_CONV(rule)      INCR_POS; rule_buf[rule_pos] = conv_itoc (((rule)->cmds[rule_cnt] >> 16) & 0xff)
 
 int cpu_rule_to_kernel_rule (char *rule_buf, u32 rule_len, kernel_rule_t *rule)
 {
@@ -707,7 +719,7 @@ int kernel_rules_load (hashcat_ctx_t *hashcat_ctx, kernel_rule_t **out_buf, u32 
 
   char *rule_buf = (char *) hcmalloc (HCBUFSIZ_LARGE);
 
-  u32 rule_len = 0;
+  int rule_len = 0;
 
   for (u32 i = 0; i < user_options->rp_files_cnt; i++)
   {
@@ -718,6 +730,9 @@ int kernel_rules_load (hashcat_ctx_t *hashcat_ctx, kernel_rule_t **out_buf, u32 
     kernel_rule_t *kernel_rules_buf = NULL;
 
     char *rp_file = user_options->rp_files[i];
+
+    char in[BLOCK_SIZE]  = { 0 };
+    char out[BLOCK_SIZE] = { 0 };
 
     FILE *fp = NULL;
 
@@ -737,7 +752,7 @@ int kernel_rules_load (hashcat_ctx_t *hashcat_ctx, kernel_rule_t **out_buf, u32 
 
     while (!feof (fp))
     {
-      rule_len = (u32) fgetl (fp, rule_buf);
+      rule_len = fgetl (fp, rule_buf);
 
       rule_line++;
 
@@ -752,11 +767,8 @@ int kernel_rules_load (hashcat_ctx_t *hashcat_ctx, kernel_rule_t **out_buf, u32 
         kernel_rules_avail += INCR_RULES;
       }
 
-      char in[RP_PASSWORD_SIZE];
-      char out[RP_PASSWORD_SIZE];
-
-      memset (in,  0, sizeof (in));
-      memset (out, 0, sizeof (out));
+      memset (in,  0, BLOCK_SIZE);
+      memset (out, 0, BLOCK_SIZE);
 
       int result = _old_apply_rule (rule_buf, rule_len, in, 1, out);
 
@@ -860,13 +872,13 @@ int kernel_rules_generate (hashcat_ctx_t *hashcat_ctx, kernel_rule_t **out_buf, 
   u32            kernel_rules_cnt = 0;
   kernel_rule_t *kernel_rules_buf = hccalloc (user_options->rp_gen, sizeof (kernel_rule_t));
 
-  char *rule_buf = (char *) hcmalloc (RP_RULE_SIZE);
+  char *rule_buf = (char *) hcmalloc (RP_RULE_BUFSIZ);
 
   for (kernel_rules_cnt = 0; kernel_rules_cnt < user_options->rp_gen; kernel_rules_cnt++)
   {
-    memset (rule_buf, 0, RP_RULE_SIZE);
+    memset (rule_buf, 0, RP_RULE_BUFSIZ);
 
-    int rule_len = generate_random_rule (rule_buf, user_options->rp_gen_func_min, user_options->rp_gen_func_max);
+    int rule_len = (int) generate_random_rule (rule_buf, user_options->rp_gen_func_min, user_options->rp_gen_func_max);
 
     if (cpu_rule_to_kernel_rule (rule_buf, rule_len, &kernel_rules_buf[kernel_rules_cnt]) == -1) continue;
   }

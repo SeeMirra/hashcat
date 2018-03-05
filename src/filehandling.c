@@ -6,7 +6,6 @@
 #include "common.h"
 #include "types.h"
 #include "memory.h"
-#include "shared.h"
 #include "filehandling.h"
 
 u64 count_lines (FILE *fd)
@@ -19,7 +18,7 @@ u64 count_lines (FILE *fd)
 
   while (!feof (fd))
   {
-    size_t nread = hc_fread (buf, sizeof (char), HCBUFSIZ_LARGE, fd);
+    size_t nread = fread (buf, sizeof (char), HCBUFSIZ_LARGE, fd);
 
     if (nread < 1) continue;
 
@@ -38,9 +37,9 @@ u64 count_lines (FILE *fd)
   return cnt;
 }
 
-size_t fgetl (FILE *fp, char *line_buf)
+int fgetl (FILE *fp, char *line_buf)
 {
-  size_t line_len = 0;
+  int line_len = 0;
 
   while (!feof (fp))
   {
@@ -113,7 +112,7 @@ size_t superchop_with_length (char *buf, const size_t len)
   return new_len;
 }
 
-size_t in_superchop (char *buf)
+int in_superchop (char *buf)
 {
   size_t len = strlen (buf);
 

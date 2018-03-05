@@ -49,7 +49,7 @@ static void loopback_format_plain (hashcat_ctx_t *hashcat_ctx, const u8 *plain_p
   }
   else
   {
-    hc_fwrite (plain_ptr, plain_len, 1, loopback_ctx->fp);
+    fwrite (plain_ptr, plain_len, 1, loopback_ctx->fp);
   }
 }
 
@@ -60,17 +60,16 @@ int loopback_init (hashcat_ctx_t *hashcat_ctx)
 
   loopback_ctx->enabled = false;
 
-  if (user_options->benchmark      == true) return 0;
-  if (user_options->example_hashes == true) return 0;
-  if (user_options->keyspace       == true) return 0;
-  if (user_options->left           == true) return 0;
-  if (user_options->opencl_info    == true) return 0;
-  if (user_options->show           == true) return 0;
-  if (user_options->stdout_flag    == true) return 0;
-  if (user_options->speed_only     == true) return 0;
-  if (user_options->progress_only  == true) return 0;
-  if (user_options->usage          == true) return 0;
-  if (user_options->version        == true) return 0;
+  if (user_options->benchmark     == true) return 0;
+  if (user_options->keyspace      == true) return 0;
+  if (user_options->left          == true) return 0;
+  if (user_options->opencl_info   == true) return 0;
+  if (user_options->show          == true) return 0;
+  if (user_options->stdout_flag   == true) return 0;
+  if (user_options->speed_only    == true) return 0;
+  if (user_options->progress_only == true) return 0;
+  if (user_options->usage         == true) return 0;
+  if (user_options->version       == true) return 0;
 
   loopback_ctx->enabled  = true;
   loopback_ctx->fp       = NULL;
@@ -160,7 +159,7 @@ void loopback_write_append (hashcat_ctx_t *hashcat_ctx, const u8 *plain_ptr, con
 
   lock_file (fp);
 
-  hc_fwrite (EOL, strlen (EOL), 1, fp);
+  fwrite (EOL, strlen (EOL), 1, fp);
 
   fflush (fp);
 
